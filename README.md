@@ -92,14 +92,15 @@ the source file on `issue-2585` was written to run inside the ARAX tree. to make
 
 nothing else in the class body was touched. the public API (`get_canonical_curies`, `get_equivalent_nodes`, `get_curie_names`, `get_preferred_names`, `get_normalizer_results`) is identical.
 
-### why not reasoner-pydantic or a copy of ARAX's openapi_server files
+### why not reasoner-pydantic, why not copy ARAX's openapi_server files
 
-two alternatives to item 3 above were considered:
+two other options we considered for item 3:
 
-- **depend on `reasoner-pydantic`** (the canonical Translator TRAPI pydantic library, https://github.com/TranslatorSRI/reasoner-pydantic). real pydantic v2 validation, but `model_dump()` and the original `openapi_server.models.*.to_dict()` differ on things like field aliases, enum serialization, and None-handling. this would break byte-for-byte parity with what ARAX emits today.
-- **copy the ~5 ARAX `openapi_server.models.*` files into this package.** RTX is MIT so this is legal. gives you literal 1:1 output because it IS the ARAX code. downside: ~5 auto-generated files and a transitive `six` dep, plus an ongoing sync burden whenever TRAPI schema (and therefore the generator output) changes upstream.
+1. `reasoner-pydantic` (https://github.com/TranslatorSRI/reasoner-pydantic), the Translator TRAPI pydantic lib. pydantic v2's `model_dump()` doesn't produce the same dict shape as openapi-generator's `.to_dict()` — aliases, enums, and None-handling all differ — so switching would change the output vs ARAX.
 
-the chosen approach (plain dicts with the full field set preserved) was picked on the view that this package is a thin client whose one job is "input a CURIE or a name, return synonyms." whether its output is a validated TRAPI instance is a concern for downstream consumers (Pathfinder, DrugBankNER, ARAX itself), who will revalidate at their own schema boundary anyway. adding pydantic here would mostly duplicate validation that callers redo, without adding any correctness guarantee at the SRI-API boundary, which is where actual divergences happen.
+2. copy the ~5 openapi_server model files from RTX directly into this package. RTX is MIT so that's fine. same output because it's the same code. downside: 5 auto-generated files to carry, a `six` dep, and a resync every time ARAX regenerates them.
+
+we went with plain dicts. this package is a thin client: given a CURIE or a name, return synonyms. whether the output is a validated TRAPI instance is the caller's problem. Pathfinder, DrugBankNER, and ARAX each revalidate at their own boundary anyway, so adding pydantic here just duplicates what they already do.
 
 ## tests
 
