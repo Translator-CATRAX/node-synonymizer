@@ -1,0 +1,1 @@
+node-synonymizer is a standalone Python client for the SRI Node Normalizer (https://nodenormalization-sri.renci.org) and Name Resolver (https://name-resolution-sri.renci.org) services. It provides CURIE canonicalization, equivalent-node lookup, and free-text name-to-CURIE mapping for Biolink-typed entities.
