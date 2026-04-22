@@ -1,8 +1,29 @@
 # node-synonymizer
 
-node-synonymizer is a standalone Python client for the SRI Node Normalizer (https://nodenormalization-sri.renci.org) and Name Resolver (https://name-resolution-sri.renci.org) services. It provides CURIE canonicalization, equivalent-node lookup, and free-text name-to-CURIE mapping for Biolink-typed entities.
+[![PyPI](https://img.shields.io/pypi/v/node-synonymizer.svg)](https://pypi.org/project/node-synonymizer/)
+[![Python](https://img.shields.io/pypi/pyversions/node-synonymizer.svg)](https://pypi.org/project/node-synonymizer/)
+[![License](https://img.shields.io/pypi/l/node-synonymizer.svg)](https://github.com/Translator-CATRAX/node-synonymizer/blob/main/LICENSE)
 
-originally extracted from RTX-ARAX (https://github.com/RTXteam/RTX), branch `issue-2585`, file `code/ARAX/NodeSynonymizer/node_synonymizer.py`.
+standalone Python client for the SRI Node Normalizer (https://nodenormalization-sri.renci.org) and Name Resolver (https://name-resolution-sri.renci.org) services. it provides CURIE canonicalization, equivalent-node lookup, and free-text name-to-CURIE mapping for Biolink-typed entities.
+
+originally extracted from RTX-ARAX (https://github.com/RTXteam/RTX), branch `issue-2585`, file [`code/ARAX/NodeSynonymizer/node_synonymizer.py`](https://github.com/RTXteam/RTX/blob/issue-2585/code/ARAX/NodeSynonymizer/node_synonymizer.py).
+
+## what it does
+
+- **node normalization**: map any CURIE to its preferred/canonical CURIE (e.g. `DOID:14330 -> MONDO:0005180`).
+- **name resolution**: resolve a free-text name or label to a canonical CURIE (e.g. `"Parkinson's disease" -> MONDO:0005180`).
+- **equivalent-node lookup**: expand a CURIE into the full cluster of equivalent identifiers across ontologies (DOID, MONDO, UMLS, MESH, CHEBI, NCBIGene, DRUGBANK, CHEMBL, ...).
+- **Biolink category lookup**: get the most specific Biolink category for a CURIE (e.g. `biolink:Disease`, `biolink:SmallMolecule`, `biolink:Gene`), or the full distribution of categories across the cluster.
+- **full normalizer metadata**: retrieve the complete SRI normalizer result — canonical id, all categories with counts, equivalent nodes, and a TRAPI-shaped `knowledge_graph` per cluster.
+- **batching + caching**: every method accepts a list of inputs and batches them into a single API call; Node Normalizer responses are cached in-memory per instance.
+- **optional async**: concurrent batching via `aiohttp` for bulk workloads (`use_async=True`).
+
+### typical use cases
+
+- mapping biomedical identifiers across ontologies for downstream analysis.
+- resolving natural-language disease / drug / gene names to canonical CURIEs.
+- building TRAPI-shaped cluster graphs from a CURIE or a name.
+- preprocessing input for Translator tools (Pathfinder, ARA/KP services, NER pipelines).
 
 ## install
 
@@ -14,7 +35,7 @@ requires python 3.12.
 
 ## pinned versions
 
-runtime deps are pinned to the exact versions used by RTX at extraction time, so the install is reproducible and consumers (Pathfinder, DrugBankNER) get the same tree ARAX runs today:
+runtime deps are pinned to the exact versions used by RTX at extraction time, so the install is reproducible and consumers get the same tree ARAX runs today:
 
 | package | version |
 |---|---|
@@ -32,7 +53,7 @@ dev extras:
 
 ## quick usage
 
-lookup by CURIE:
+### canonicalize a CURIE
 
 ```python
 from node_synonymizer import NodeSynonymizer
@@ -44,19 +65,66 @@ print(syn.get_canonical_curies("DOID:14330"))
 #                 'preferred_category': 'biolink:Disease'}}
 ```
 
-lookup by free-text name:
+### resolve a free-text name
 
 ```python
 syn = NodeSynonymizer()
 print(syn.get_canonical_curies(names="Parkinson's disease"))
+# {"Parkinson's disease": {'preferred_curie': 'MONDO:0005180',
+#                          'preferred_name': 'Parkinson disease',
+#                          'preferred_category': 'biolink:Disease'}}
 ```
 
-get equivalent nodes in the cluster:
+### batch both at once
 
 ```python
 syn = NodeSynonymizer()
-print(syn.get_equivalent_nodes("DOID:14330"))
+print(syn.get_canonical_curies(
+    curies=["DOID:14330", "CHEMBL.COMPOUND:CHEMBL112"],
+    names=["Warfarin"],
+))
 ```
+
+### get all equivalent CURIEs in the cluster
+
+```python
+syn = NodeSynonymizer()
+equivalents = syn.get_equivalent_nodes("DOID:14330")
+print(equivalents["DOID:14330"])
+# ['MONDO:0005180', 'DOID:14330', 'OMIM.PS:168600', 'UMLS:C0030567', 'MESH:D010300', ...]
+```
+
+### look up Biolink category
+
+```python
+syn = NodeSynonymizer()
+print(syn.get_curie_category("CHEMBL.COMPOUND:CHEMBL112"))
+# {'CHEMBL.COMPOUND:CHEMBL112': 'biolink:SmallMolecule'}
+```
+
+### full normalizer result
+
+```python
+syn = NodeSynonymizer()
+result = syn.get_normalizer_results("PTGS1")
+# result["PTGS1"] has: id, categories, nodes, total_synonyms, knowledge_graph
+```
+
+## public API
+
+| method | purpose |
+|---|---|
+| `NodeSynonymizer(sqlite_file_name=None, autocomplete=True, use_async=False)` | construct a client. `sqlite_file_name` is accepted for backwards compat and ignored. `autocomplete=False` switches Name Resolver to exact-phrase matching. `use_async=True` enables concurrent batching via aiohttp. |
+| `get_canonical_curies(curies=None, names=None, return_all_categories=False, debug=False) -> dict` | canonical CURIE + preferred name + preferred category for each input (CURIE or name). with `return_all_categories=True`, also returns a `{category: count}` map across the cluster. |
+| `get_equivalent_nodes(curies=None, names=None, include_unrecognized_entities=True, debug=False) -> dict` | list of equivalent CURIEs in the same SRI cluster for each input. |
+| `get_preferred_names(curies, debug=False) -> dict` | preferred (canonical) name for each input CURIE. |
+| `get_curie_names(curies, debug=False) -> dict` | the direct (non-preferred) name attached to the input CURIE itself, not its canonical form. |
+| `get_curie_category(curies, debug=False) -> dict` | most specific Biolink category for each input. |
+| `get_distinct_category_list(debug=False) -> list` | all Biolink category names the class knows about (derived from `bmt`). |
+| `get_normalizer_results(entities, max_synonyms=1000000, debug=False) -> dict` | full SRI normalizer result per input: canonical id, categories with counts, equivalent nodes with metadata, and a TRAPI-shaped `knowledge_graph`. |
+| `get_cache_stats() -> dict` | in-memory cache hits / misses / hit rate for debugging. |
+
+all methods accept a single string, a list, or a set of inputs. returns are keyed by the original input string. missing / unresolved inputs map to `None`.
 
 ## endpoints
 
@@ -104,7 +172,7 @@ we went with plain dicts. this package is a thin client: given a CURIE or a name
 
 ## tests
 
-25 live tests adapted from RTX's `code/ARAX/test/test_ARAX_synonymizer.py`. the only change was dropping the ARAX sys.path hack; the test bodies are identical. they hit the real SRI endpoints at RENCI, so they need network access. a handful will fail if RENCI is down.
+25 live tests adapted from RTX's [`code/ARAX/test/test_ARAX_synonymizer.py`](https://github.com/RTXteam/RTX/blob/issue-2585/code/ARAX/test/test_ARAX_synonymizer.py). the only change was dropping the ARAX sys.path hack; the test bodies are identical. they hit the real SRI endpoints at RENCI, so they need network access. a handful will fail if RENCI is down.
 
 ```
 pip install -e '.[dev]'
@@ -203,7 +271,7 @@ sample node keys: ['attributes', 'categories', 'is_set', 'name']
 sample attribute keys: ['attribute_source', 'attribute_type_id', 'attributes', 'description', 'original_attribute_name', 'value', 'value_type_id', 'value_url']
 ```
 
-note the sample node keys (`attributes`, `categories`, `is_set`, `name`) and sample attribute keys (all 8 fields incl. the `None`-defaulted `original_attribute_name`, `value_url`, `attributes`) confirm byte-for-byte parity with ARAX's original `openapi_server.models.*.to_dict()` output. cluster counts (`len(equivalents)=16`, `nodes in cluster=27`) can drift when RENCI updates.
+the sample node keys (`attributes`, `categories`, `is_set`, `name`) and sample attribute keys (all 8 fields incl. the `None`-defaulted `original_attribute_name`, `value_url`, `attributes`) confirm the output keeps the same shape as ARAX's original `openapi_server.models.*.to_dict()`. cluster counts (`len(equivalents)=16`, `nodes in cluster=27`) can drift when RENCI updates.
 
 ## development
 
@@ -217,6 +285,8 @@ source .venv/bin/activate
 pip install -e '.[dev]'
 pytest -v
 ```
+
+issues: https://github.com/Translator-CATRAX/node-synonymizer/issues
 
 ## license
 

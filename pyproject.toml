@@ -13,12 +13,30 @@ license-files = ["LICENSE"]
 authors = [
     { name = "Adilbek Bazarkulov", email = "bazarkuad@gmail.com" },
 ]
+keywords = [
+    "translator",
+    "biolink",
+    "sri",
+    "node-normalizer",
+    "name-resolution",
+    "curie",
+    "biomedical",
+    "ontology",
+    "ncats",
+    "bioinformatics",
+]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
-    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
     "aiohttp==3.9.4",
@@ -34,7 +52,10 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/Translator-CATRAX/node-synonymizer"
+Repository = "https://github.com/Translator-CATRAX/node-synonymizer"
 Issues = "https://github.com/Translator-CATRAX/node-synonymizer/issues"
+"SRI Node Normalizer" = "https://nodenormalization-sri.renci.org/1.5/docs"
+"SRI Name Resolver" = "https://name-resolution-sri.renci.org/docs"
 
 [tool.setuptools.packages.find]
 where = ["src"]
